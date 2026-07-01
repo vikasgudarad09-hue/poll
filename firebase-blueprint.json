@@ -1,0 +1,25 @@
+{
+  "entities": {
+    "Poll": {
+      "title": "Poll",
+      "description": "The main poll data",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string" },
+        "candidates": { "type": "array" },
+        "interstitialAdUrl": { "type": "string" },
+        "interstitialAdText": { "type": "string" },
+        "bannerAdUrl": { "type": "string" },
+        "bannerAdText": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "recentPhotos": { "type": "array" }
+      }
+    }
+  },
+  "firestore": {
+    "/polls/{pollId}": {
+      "schema": "Poll",
+      "description": "Stores the poll data"
+    }
+  }
+}

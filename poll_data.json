@@ -1,0 +1,38 @@
+{
+  "question": "Which one is good?",
+  "candidates": [
+    {
+      "id": "c1",
+      "name": "Name 1",
+      "photoUrl": "",
+      "colorTheme": "blue",
+      "votes": 26
+    },
+    {
+      "id": "c2",
+      "name": "Name 2",
+      "photoUrl": "",
+      "colorTheme": "green",
+      "votes": 51
+    },
+    {
+      "id": "c3",
+      "name": "Name 3",
+      "photoUrl": "",
+      "colorTheme": "orange",
+      "votes": 10
+    },
+    {
+      "id": "c4",
+      "name": "Name 4",
+      "photoUrl": "",
+      "colorTheme": "purple",
+      "votes": 15
+    }
+  ],
+  "interstitialAdUrl": "",
+  "interstitialAdText": "Ad induced by Admin",
+  "bannerAdUrl": "",
+  "bannerAdText": "Ad Banner",
+  "contactPhone": "9876543210"
+}
