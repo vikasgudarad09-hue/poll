@@ -1,1 +1,1 @@
-{"root":["./clear-local.js","./commit.js","./reset.ts","./server.ts","./test-read.ts","./test-reset.ts","./vite.config.ts","./dist/assets/index-cx_lajbd.js","./src/app.tsx","./src/firebase.ts","./src/main.tsx","./src/types.ts"],"version":"5.8.3"}
+{"root":["./check-poll.ts","./clear-all.ts","./clear-local.ts","./clear-old-ips.ts","./reset.ts","./test-read.ts","./test-reset.ts","./vite.config.ts","./wipe.ts","./dist/assets/index-CDWhAZyb.js","./src/App.tsx","./src/firebase.ts","./src/main.tsx","./src/types.ts"],"version":"5.8.3"}

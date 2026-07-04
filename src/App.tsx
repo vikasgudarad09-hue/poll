@@ -482,7 +482,7 @@ export default function App() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="p-6 md:p-10 flex flex-col flex-grow max-w-2xl mx-auto w-full"
+                  className="p-6 md:p-10 pb-24 md:pb-24 flex flex-col flex-grow max-w-2xl mx-auto w-full"
                 >
                 {activePollData.questions.map((q, qIndex) => {
                   const hasVoted = votedQuestions[q.id] || viewAllResults;
