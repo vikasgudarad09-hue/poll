@@ -1,5 +1,4 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     // Global Safety Net
@@ -7,23 +6,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
-
-    function isValidPoll(data) {
-      return data.keys().hasAll(['question', 'candidates']) &&
-             data.question is string &&
-             data.candidates is list;
+    match /polls/{pollId} {
+      allow read: if true;
+      allow write: if true;
     }
 
-    match /polls/{pollId} {
-      // Allow read to everyone so they can view the poll
-      allow read: if true;
-      
-      // Allow create and update to everyone because we use a custom password in the frontend
-      // (This is inherently insecure but matches the requested app structure)
-      allow create: if isValidPoll(incoming());
-      allow update: if isValidPoll(incoming());
+    match /polls/{pollId}/ip_records/{ipDocId} {
+      allow read, write: if true;
     }
   }
 }

@@ -6,16 +6,20 @@ export interface Candidate {
   votes: number;
 }
 
-export interface PollHistoryEntry {
+export interface Question {
   id: string;
-  timestamp: string;
-  question: string;
+  text: string;
   candidates: Candidate[];
 }
 
+export interface PollHistoryEntry {
+  id: string;
+  timestamp: string;
+  questions: Question[];
+}
+
 export interface PollData {
-  question: string;
-  candidates: Candidate[];
+  questions: Question[];
   interstitialAdUrl: string;
   interstitialAdText: string;
   bannerAdUrl: string;
@@ -23,4 +27,5 @@ export interface PollData {
   contactPhone: string;
   recentPhotos?: string[];
   history?: PollHistoryEntry[];
+  faqs?: { question: string; answer: string }[];
 }
