@@ -24,6 +24,7 @@ export interface PollData {
   interstitialAdText: string;
   bannerAdUrl: string;
   bannerAdText: string;
+  adRedirectUrl?: string;
   contactPhone: string;
   recentPhotos?: string[];
   history?: PollHistoryEntry[];

@@ -5,7 +5,7 @@ import confetti from 'canvas-confetti';
 import Cropper from 'react-easy-crop';
 import { PollData } from './types';
 import { db } from './firebase';
-import { doc, onSnapshot, setDoc, updateDoc, increment, getDoc, getDocFromServer, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, increment, getDoc, getDocFromServer, runTransaction, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
 const THEMES = {
   blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', fill: 'bg-blue-600', lightFill: 'bg-blue-100' },
@@ -58,15 +58,16 @@ const DEFAULT_POLL_DATA: PollData = {
       id: "q1",
       text: "Which one is good?",
       candidates: [
-        { id: "c1", name: "Name 1", photoUrl: "", colorTheme: "blue", votes: 25 },
-        { id: "c2", name: "Name 2", photoUrl: "", colorTheme: "green", votes: 50 },
-        { id: "c3", name: "Name 3", photoUrl: "", colorTheme: "orange", votes: 10 },
-        { id: "c4", name: "Name 4", photoUrl: "", colorTheme: "purple", votes: 15 },
+        { id: "c1", name: "Name 1", photoUrl: "", colorTheme: "blue", votes: 0 },
+        { id: "c2", name: "Name 2", photoUrl: "", colorTheme: "green", votes: 0 },
+        { id: "c3", name: "Name 3", photoUrl: "", colorTheme: "orange", votes: 0 },
+        { id: "c4", name: "Name 4", photoUrl: "", colorTheme: "purple", votes: 0 },
       ]
     }
   ],
   interstitialAdUrl: "",
   interstitialAdText: "Ad induced by Admin",
+  adRedirectUrl: "",
   bannerAdUrl: "",
   bannerAdText: "Ad Banner",
   contactPhone: "9876543210",
@@ -122,11 +123,17 @@ export default function App() {
   const [adminError, setAdminError] = useState('');
   const [pollData, setPollData] = useState<PollData | null>(null);
   
-  const [viewState, setViewState] = useState<'main' | 'ad'>('main');
+  const [showAd, setShowAd] = useState(false);
   const [userIp, setUserIp] = useState<string | null>(null);
   const [isVerifyingIp, setIsVerifyingIp] = useState(true);
 
   useEffect(() => {
+    if (window.location.search.includes('clear=1')) {
+      localStorage.removeItem('votedQuestions');
+      localStorage.removeItem('fallbackIpHash');
+      window.location.href = window.location.pathname;
+    }
+    
     let mounted = true;
     fetchUserIpHash().then(hash => {
       if (mounted) {
@@ -205,12 +212,16 @@ export default function App() {
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (viewState === 'ad') {
+    if (showAd) {
       timer = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            setViewState('main');
+            if (activePollData?.adRedirectUrl) {
+              window.location.href = activePollData.adRedirectUrl;
+            } else {
+              setShowAd(false);
+            }
             return 0;
           }
           return prev - 1;
@@ -218,7 +229,7 @@ export default function App() {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [viewState]);
+  }, [showAd, activePollData?.adRedirectUrl]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -275,13 +286,17 @@ export default function App() {
       } catch (e) {
         console.warn("Could not save to localStorage", e);
       }
-      // Show interstitial ad after voting if there's an ad URL
-      if (activePollData.interstitialAdUrl) {
-         setTimeLeft(5);
-         setViewState('ad');
-      }
       return next;
     });
+
+    // Show interstitial ad after voting
+    if (activePollData) {
+       setTimeout(() => {
+         setTimeLeft(5);
+         setShowAd(true);
+       }, 50);
+    }
+
 
     try {
       const pollRef = doc(db, 'polls', 'main_poll');
@@ -357,6 +372,37 @@ export default function App() {
 
   return (
     <div className="min-h-[100dvh] bg-[#F0F2F5] flex flex-col items-center font-sans antialiased text-[#1C1E21] selection:bg-[#1877F2] selection:text-white">
+      <AnimatePresence>
+        {showAd && (
+          <motion.div 
+              key="ad-view"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              transition={{ duration: 0.3 }}
+              className="fixed inset-0 z-[150] flex flex-col bg-white"
+            >
+            <div className="flex-grow p-6 flex flex-col items-center justify-center">
+               <div className="w-full max-w-2xl aspect-[4/3] bg-[#fff9e6] border-2 border-[#ffcc80] rounded-2xl flex flex-col items-center justify-center text-center p-6 shadow-sm overflow-hidden relative">
+                 {pollData.interstitialAdUrl ? (
+                    <img src={pollData.interstitialAdUrl} className="absolute inset-0 w-full h-full object-cover" alt="Ad" />
+                 ) : (
+                   <>
+                     <Megaphone className="w-16 h-16 text-[#f57c00] mb-4 drop-shadow-sm" />
+                     <h3 className="text-3xl font-black text-[#f57c00] mb-2">Ad</h3>
+                     <p className="text-[#f57c00] font-medium max-w-[80%]">{pollData.interstitialAdText}</p>
+                   </>
+                 )}
+               </div>
+            </div>
+            <div className="bg-[#e8f5e9] border-t-2 border-[#c8e6c9] p-4 flex items-center justify-center gap-2 text-[#2e7d32] font-medium shrink-0 shadow-inner pb-8">
+              <Clock className="w-5 h-5" />
+              Result will be shown in {timeLeft} seconds
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Admin Login Modal */}
       <AnimatePresence>
         {showAdminLogin && (
@@ -447,6 +493,35 @@ export default function App() {
                 setIsAdmin(false);
               }} 
               onLogout={() => setIsAdmin(false)}
+              onResetData={async () => {
+                try {
+                  const pollRef = doc(db, 'polls', 'main_poll');
+                  const newData = { ...pollData };
+                  if (newData.questions) {
+                    newData.questions.forEach(q => {
+                      if (q.candidates) {
+                        q.candidates.forEach(c => c.votes = 0);
+                      }
+                    });
+                  } else if ((newData as any).candidates) {
+                    (newData as any).candidates.forEach((c: any) => c.votes = 0);
+                  }
+                  await setDoc(pollRef, newData);
+                  
+                  const ipRecordsRef = collection(db, 'polls/main_poll/ip_records');
+                  const snapshot = await getDocs(ipRecordsRef);
+                  if (!snapshot.empty) {
+                    for (const docSnap of snapshot.docs) {
+                      await deleteDoc(docSnap.ref);
+                    }
+                  }
+                  
+                  setPollData(newData);
+                  alert('All votes and IP records have been cleared successfully.');
+                } catch (e: any) {
+                  alert('Failed to reset votes: ' + e.message);
+                }
+              }}
             />
           </motion.div>
         ) : (
@@ -475,17 +550,17 @@ export default function App() {
           {/* Main Content Area */}
           <div className="flex-grow flex flex-col overflow-y-auto scrollbar-hide bg-[#F0F2F5] relative">
             <AnimatePresence mode="wait">
-              {viewState === 'main' ? (
                 <motion.div 
                   key="main-view"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="p-6 md:p-10 pb-24 md:pb-24 flex flex-col flex-grow max-w-2xl mx-auto w-full"
+                  className="p-4 md:p-10 pb-24 md:pb-24 flex flex-col flex-grow max-w-2xl mx-auto w-full"
                 >
                 {activePollData.questions.map((q, qIndex) => {
-                  const hasVoted = votedQuestions[q.id] || viewAllResults;
+                  const didVoteThisQuestion = votedQuestions[q.id];
+                  const showResults = didVoteThisQuestion || viewAllResults;
                   const qTotalVotes = q.candidates.reduce((sum, c) => sum + c.votes, 0) || 1;
                   const selectedCandidate = selectedCandidates[q.id];
 
@@ -496,7 +571,7 @@ export default function App() {
                           <span className="px-3 py-1 bg-zinc-100 text-zinc-600 rounded-full text-xs font-bold uppercase tracking-widest border border-zinc-200">
                             Question {qIndex + 1}
                           </span>
-                          {votedQuestions[q.id] && (
+                          {didVoteThisQuestion && (
                             <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest border border-emerald-200 flex items-center gap-1">
                               <Check className="w-3 h-3" /> Voted
                             </span>
@@ -530,19 +605,19 @@ export default function App() {
                           </button>
                         </div>
                       </div>
-                      <h2 className="font-display text-3xl md:text-4xl font-bold mb-8 text-[#1C1E21] leading-tight">
+                      <h2 className="font-display text-2xl md:text-4xl font-bold mb-6 md:mb-8 text-[#1C1E21] leading-tight">
                         {q.text}
                       </h2>
                       
-                      <AnimatePresence mode="wait">
-                        {!hasVoted ? (
+                      <div className="flex flex-col gap-8">
+                        {!didVoteThisQuestion && (
                           <motion.div 
                             key="voting"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0, y: -10 }}
                             transition={{ duration: 0.2 }}
-                            className="flex flex-col gap-4 mb-6"
+                            className="flex flex-col gap-4"
                           >
                             {q.candidates.map((c, i) => {
                               const isSelected = selectedCandidate === c.id;
@@ -555,28 +630,28 @@ export default function App() {
                                   onClick={() => {
                                     setSelectedCandidates({ ...selectedCandidates, [q.id]: c.id });
                                   }}
-                                  className={`group flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-300 ${isSelected ? 'bg-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] ring-2 ring-[#1877F2] scale-[1.02]' : 'bg-white shadow-sm ring-1 ring-zinc-200 hover:shadow-md hover:ring-zinc-300'}`}
+                                  className={`group flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-2xl cursor-pointer transition-all duration-300 ${isSelected ? 'bg-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] ring-2 ring-[#1877F2] scale-[1.02]' : 'bg-white shadow-sm ring-1 ring-zinc-200 hover:shadow-md hover:ring-zinc-300'}`}
                                 >
-                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors duration-300 ${isSelected ? 'bg-[#1877F2] text-white' : 'bg-zinc-100 text-transparent group-hover:bg-zinc-200'}`}>
-                                    <Check className="w-4 h-4" />
+                                  <div className={`w-5 h-5 md:w-7 md:h-7 rounded-full flex items-center justify-center shrink-0 transition-colors duration-300 ${isSelected ? 'bg-[#1877F2] text-white' : 'bg-zinc-100 text-transparent group-hover:bg-zinc-200'}`}>
+                                    <Check className="w-3 h-3 md:w-4 md:h-4" />
                                   </div>
                                   {c.photoUrl ? (
                                      <div className="relative shrink-0 overflow-hidden rounded-xl border border-zinc-100 shadow-sm">
-                                       <img src={c.photoUrl} className="w-14 h-14 object-cover transition-transform duration-500 group-hover:scale-110" alt={c.name} />
-                                       <button 
-                                         onClick={(e) => { e.stopPropagation(); setFullScreenImage(c.photoUrl); }}
+                                       <img src={c.photoUrl} className="w-10 h-10 md:w-14 md:h-14 object-cover transition-transform duration-500 group-hover:scale-110" alt={c.name} />
+                                       <button
+                                          onClick={(e) => { e.stopPropagation(); setFullScreenImage(c.photoUrl); }}
                                          className="absolute inset-0 bg-[#1877F2]/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                                          title="View Fullscreen"
                                        >
-                                         <Maximize className="w-5 h-5" />
+                                         <Maximize className="w-4 h-4 md:w-5 md:h-5" />
                                        </button>
                                      </div>
                                   ) : (
-                                     <div className="shrink-0 w-14 h-14 bg-zinc-50 rounded-xl flex items-center justify-center text-zinc-300 border border-zinc-200 shadow-sm transition-colors group-hover:bg-zinc-100">
-                                       <User className="w-7 h-7" />
+                                     <div className="shrink-0 w-10 h-10 md:w-14 md:h-14 bg-zinc-50 rounded-xl flex items-center justify-center text-zinc-300 border border-zinc-200 shadow-sm transition-colors group-hover:bg-zinc-100">
+                                       <User className="w-5 h-5 md:w-7 md:h-7" />
                                      </div>
                                   )}
-                                  <span className={`font-medium text-lg transition-colors ${isSelected ? 'text-[#1C1E21]' : 'text-zinc-700'}`}>
+                                  <span className={`font-medium text-base md:text-lg transition-colors ${isSelected ? 'text-[#1C1E21]' : 'text-zinc-700'}`}>
                                     {c.name}
                                   </span>
                                 </motion.div>
@@ -603,44 +678,40 @@ export default function App() {
                               )}
                             </motion.button>
                           </motion.div>
-                        ) : (
+                        )}
+
+                        {showResults && (
                           <motion.div 
                             key="results"
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3 }}
-                            className="flex flex-col gap-6 mb-4"
+                            className="flex flex-col gap-6"
                           >
                             {q.candidates.map((c, i) => {
                               const percentage = qTotalVotes > 0 ? Math.round((c.votes / qTotalVotes) * 100) : 0;
-                              const isWinner = c.votes === Math.max(...q.candidates.map(cand => cand.votes)) && c.votes > 0;
                               return (
                                 <motion.div 
                                   key={c.id} 
                                   initial={{ opacity: 0, scale: 0.95 }}
                                   animate={{ opacity: 1, scale: 1 }}
                                   transition={{ delay: i * 0.1, type: "spring", stiffness: 100 }}
-                                  className={`flex flex-col gap-3 p-4 bg-white border ${isWinner ? 'border-[#1877F2]' : 'border-zinc-200'} rounded-2xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden`}
+                                  className={`flex flex-col gap-2 md:gap-3 p-3 md:p-4 bg-white border border-zinc-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden`}
                                 >
-                                  {isWinner && (
-                                    <div className="absolute top-0 right-0 bg-[#1877F2] text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-widest z-10">
-                                      Winning
-                                    </div>
-                                  )}
-                                  <div className="flex justify-between items-center text-sm font-semibold text-zinc-700 relative z-10">
-                                    <span className="flex items-center gap-3">
+                                  <div className="flex justify-between items-center text-xs md:text-sm font-semibold text-zinc-700 relative z-10">
+                                    <span className="flex items-center gap-2 md:gap-3">
                                        {c.photoUrl ? (
-                                         <img src={c.photoUrl} className="w-12 h-12 object-cover rounded-xl shadow-sm border border-zinc-100" alt={c.name} />
+                                         <img src={c.photoUrl} className="w-8 h-8 md:w-12 md:h-12 object-cover rounded-xl shadow-sm border border-zinc-100" alt={c.name} />
                                        ) : (
-                                         <div className="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400 border border-zinc-200 shadow-sm">
-                                           <User className="w-6 h-6" />
+                                         <div className="w-8 h-8 md:w-12 md:h-12 bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400 border border-zinc-200 shadow-sm">
+                                           <User className="w-4 h-4 md:w-6 md:h-6" />
                                          </div>
                                        )}
-                                       <span className={`text-lg ${isWinner ? 'text-[#1877F2] font-bold' : 'text-[#1C1E21]'}`}>{c.name}</span>
+                                       <span className="text-base md:text-lg text-[#1C1E21]">{c.name}</span>
                                     </span>
                                     <div className="flex flex-col items-end">
-                                      <span className="text-zinc-500 font-medium">{c.votes.toLocaleString()} {c.votes === 1 ? 'vote' : 'votes'}</span>
-                                      <span className={`${isWinner ? 'text-[#1877F2]' : 'text-[#1C1E21]'} font-bold text-lg`}>{percentage}%</span>
+                                      <span className="text-zinc-500 font-medium">{c.votes.toLocaleString()} <span className="hidden md:inline">{c.votes === 1 ? 'vote' : 'votes'}</span></span>
+                                      <span className="text-[#1C1E21] font-bold text-base md:text-lg">{percentage}%</span>
                                     </div>
                                   </div>
                                   <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden shadow-inner mt-1 relative z-10">
@@ -670,7 +741,7 @@ export default function App() {
                             </motion.div>
                           </motion.div>
                         )}
-                      </AnimatePresence>
+                      </div>
                     </div>
                   );
                 })}
@@ -686,9 +757,9 @@ export default function App() {
                   {!viewAllResults && (
                     <button 
                       onClick={() => {
-                        if (activePollData?.interstitialAdUrl) {
+                        if (activePollData) {
                           setTimeLeft(5);
-                          setViewState('ad');
+                          setShowAd(true);
                         }
                         setViewAllResults(true);
                       }}
@@ -713,40 +784,13 @@ export default function App() {
                    </div>
                 </div>
               </motion.div>
-              ) : (
-                <motion.div 
-                  key="ad-view"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="flex-grow flex flex-col bg-white"
-                >
-                <div className="flex-grow p-6 flex flex-col items-center justify-center">
-                   <div className="w-full aspect-[4/3] bg-[#fff9e6] border-2 border-[#ffcc80] rounded-2xl flex flex-col items-center justify-center text-center p-6 shadow-sm overflow-hidden relative">
-                     {pollData.interstitialAdUrl ? (
-                        <img src={pollData.interstitialAdUrl} className="absolute inset-0 w-full h-full object-cover" alt="Ad" />
-                     ) : (
-                       <>
-                         <Megaphone className="w-16 h-16 text-[#f57c00] mb-4 drop-shadow-sm" />
-                         <h3 className="text-3xl font-black text-[#f57c00] mb-2">Ad</h3>
-                         <p className="text-[#f57c00] font-medium max-w-[80%]">{pollData.interstitialAdText}</p>
-                       </>
-                     )}
-                   </div>
-                </div>
-                <div className="bg-[#e8f5e9] border-t-2 border-[#c8e6c9] p-4 flex items-center justify-center gap-2 text-[#2e7d32] font-medium shrink-0 shadow-inner">
-                  <Clock className="w-5 h-5" />
-                  Result will be shown in {timeLeft} seconds
-                </div>
-              </motion.div>
-            )}
             </AnimatePresence>
           </div>
 
+
+
           {/* Footer */}
-          {viewState === 'main' && (
-            <footer className="bg-white border-t border-zinc-200 text-[#1C1E21] p-6 md:p-8 flex flex-col items-center gap-8 shrink-0">
+          <footer className="bg-white border-t border-zinc-200 text-[#1C1E21] p-6 md:p-8 flex flex-col items-center gap-8 shrink-0">
               {pollData.faqs && pollData.faqs.length > 0 && (
                 <div className="w-full max-w-2xl flex flex-col gap-3">
                   <h3 className="text-lg font-display font-bold text-[#1C1E21] mb-2 flex items-center gap-2">
@@ -796,7 +840,6 @@ export default function App() {
                 <span className="text-sm font-medium tracking-wide text-zinc-500">Contact for Ad: <span className="text-zinc-800">{pollData.contactPhone}</span></span>
               </div>
             </footer>
-          )}
           
           {/* Confirmation Dialog Overlay */}
           <AnimatePresence>
@@ -881,7 +924,7 @@ export default function App() {
   );
 }
 
-function AdminPanel({ data, onSave, onLogout }: { data: PollData, onSave: (d: PollData) => void, onLogout: () => void }) {
+function AdminPanel({ data, onSave, onLogout, onResetData }: { data: PollData, onSave: (d: PollData) => void, onLogout: () => void, onResetData: () => Promise<void> }) {
   const [form, setForm] = useState<PollData>(() => {
     if (data.questions) return data;
     return {
@@ -1055,12 +1098,24 @@ function AdminPanel({ data, onSave, onLogout }: { data: PollData, onSave: (d: Po
         <h2 className="text-3xl font-display font-bold flex items-center gap-3 text-[#1C1E21]">
           <Settings className="w-8 h-8 text-[#1C1E21]" /> Admin Dashboard
         </h2>
-        <button 
-          onClick={onLogout}
-          className="flex items-center gap-2 px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold uppercase tracking-wider text-sm transition-colors"
-        >
-          <LogOut className="w-4 h-4" /> Logout
-        </button>
+        <div className="flex gap-2 items-center">
+          <button 
+            onClick={async () => {
+              if (confirm('Are you sure you want to reset all votes and data? This action cannot be undone.')) {
+                await onResetData();
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl font-bold uppercase tracking-wider text-sm transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> Reset Data
+          </button>
+          <button 
+            onClick={onLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold uppercase tracking-wider text-sm transition-colors"
+          >
+            <LogOut className="w-4 h-4" /> Logout
+          </button>
+        </div>
       </div>
       
       <div className="space-y-10">
