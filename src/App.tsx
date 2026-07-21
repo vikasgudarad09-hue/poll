@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Menu, BarChart2, Share2, Phone, Megaphone, Clock, User, Check, Settings, History, Maximize, X, Download, LogOut, ChevronDown, Plus, Trash2, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -115,6 +115,50 @@ const fetchUserIpHash = async (): Promise<string> => {
   }
   return getFallbackIpHash();
 };
+
+function GoogleAd({ className = "" }: { className?: string }) {
+  const adPushed = useRef(false);
+  const insRef = useRef<HTMLModElement>(null);
+
+  useEffect(() => {
+    let timeoutId: number;
+    
+    const pushAd = () => {
+      if (adPushed.current) return;
+      if (insRef.current && insRef.current.offsetWidth > 0) {
+        try {
+          // @ts-ignore
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          adPushed.current = true;
+        } catch (e) {
+          // Ignore known adsense errors
+        }
+      } else {
+        // Retry after a short delay if width is 0 (e.g., during animations)
+        timeoutId = window.setTimeout(pushAd, 200);
+      }
+    };
+
+    pushAd();
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
+  return (
+    <div className={`w-full overflow-hidden flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200/60 rounded-3xl p-2 ${className}`}>
+      <span className="text-[10px] uppercase text-zinc-400 font-bold tracking-wider mb-1">Advertisement</span>
+      <ins ref={insRef}
+           className="adsbygoogle w-full block"
+           style={{ display: 'block', minHeight: '100px', width: '100%' }}
+           data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" 
+           data-ad-slot="XXXXXXXXXX"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+    </div>
+  );
+}
 
 export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -771,7 +815,7 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="w-full mb-8">
+                <div className="w-full mb-8 flex flex-col gap-4">
                    <div className="w-full h-32 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60 rounded-3xl flex items-center justify-center shadow-sm overflow-hidden relative cursor-pointer hover:shadow-md transition-all duration-300 group">
                      {pollData.bannerAdUrl ? (
                         <img src={pollData.bannerAdUrl} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="Banner Ad" />
@@ -782,6 +826,9 @@ export default function App() {
                        </div>
                      )}
                    </div>
+                   
+                   {/* Google Ad Slot */}
+                   <GoogleAd className="w-full min-h-[100px]" />
                 </div>
               </motion.div>
             </AnimatePresence>
