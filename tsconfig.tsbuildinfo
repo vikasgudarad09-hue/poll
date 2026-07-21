@@ -1,1 +1,1 @@
-{"root":["./src/AdminPanel.tsx","./src/App.tsx","./src/firebase.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts"],"version":"5.8.3"}
+{"root":["./src/AdminPanel.tsx","./src/App.tsx","./src/firebase.ts","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/LazyImage.tsx"],"version":"5.8.3"}
